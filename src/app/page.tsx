@@ -1,3 +1,4 @@
+"use client"; 
 export const dynamic = "force-dynamic"; // 毎リクエストで新鮮データ
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,7 @@ export default function Page() {
         const res = await fetch("/api/summarize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: article.content }),
+          body: JSON.stringify({ content: article.content || article.title }),
         });
         const data = await res.json();
         setInsights((prev) => ({ ...prev, [article.title]: data.result }));
