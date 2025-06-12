@@ -1,11 +1,10 @@
 // frontend/src/app/api/news/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";          // 毎リクエストで実行
+export const dynamic = "force-dynamic";        // 毎リクエスト実行
 
-export async function GET(_req: NextRequest) {
-  const apiKey = process.env.NEWS_API_KEY!;      // Vercel の環境変数
-
+export async function GET(_req: NextRequest) {  // ★ 必ず GET
+  const apiKey = process.env.NEWS_API_KEY!;
   const url =
     `https://newsapi.org/v2/top-headlines?language=en&pageSize=5&apiKey=${apiKey}`;
 
