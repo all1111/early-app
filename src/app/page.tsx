@@ -1,5 +1,5 @@
-/* 使うなら "use client" のまま */
-export const dynamic = "force-dynamic";
+"use client";
+export const dynamic = "force-dynamic"; // 毎リクエストで新鮮データ
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -13,39 +13,72 @@ type Article = {
 
 export default function Page() {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [insights, setInsights] = useState<Record<string, string>>({});
 
+  /* -------------------- News を取得 -------------------- */
   useEffect(() => {
-    // NewsAPI の記事取得
     const fetchNews = async () => {
-      const res = await fetch("/api/news");
-      const data = await res.json();
-      setArticles(data.articles ?? []);
+      try {
+        const res = await fetch("/api/news");
+        const data = await res.json();
+        setArticles(data.articles ?? []);
+      } catch (err) {
+        console.error("News fetch error:", err);
+      }
     };
     fetchNews();
   }, []);
 
+  /* ------------------- summarize 呼び出し（停止中） ------------------- */
+  /*
+  useEffect(() => {
+    const summarize = async () => {
+      for (const article of articles) {
+        try {
+          const res = await fetch("/api/summarize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: article.content || article.title }),
+          });
+          const data = await res.json();
+          setInsights(prev => ({ ...prev, [article.title]: data.insight }));
+        } catch (err) {
+          console.error("Summarize error:", err);
+        }
+      }
+    };
+    if (articles.length > 0) summarize();
+  }, [articles]);
+  */
+  /* ------------------------------------------------------------------ */
+
   return (
     <div className="p-6 space-y-4">
-      {articles.map((a) => (
-        <Card key={a.title}>
+      {articles.map((article) => (
+        <Card key={article.title}>
           <CardHeader>
-            <CardTitle>{a.title}</CardTitle>
+            <CardTitle>{article.title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500">{a.publishedAt}</p>
+            <p className="text-sm text-gray-500">{article.publishedAt}</p>
             <a
-              href={a.url}
+              href={article.url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-blue-600 underline mt-2 block"
             >
               記事を読む →
             </a>
+
+            {/* summarize を再有効化したら表示される */}
+            {insights[article.title] && (
+              <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">
+                {insights[article.title]}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}
     </div>
   );
 }
-
-/* ---------- ここまで ---------- */
