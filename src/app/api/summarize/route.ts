@@ -1,28 +1,32 @@
-// src/app/api/summarize/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 
-export async function POST(req: Request) {
-  console.log('API hit'); // ← Vercelログ確認用の追記
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  try {
-    const { article } = await req.json();
+export async function POST(req: NextRequest) {
+  console.log("API hit");
 
-    // ここでOpenAIに投げたり、要約処理を行う想定
-    // 仮で成功レスポンスだけ返す
-    return new Response(JSON.stringify({
-      message: 'summarization success',
-      received: article
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+  const { article } = await req.json();
 
-  } catch (error) {
-    console.error('API Error:', error);
-    return new Response(JSON.stringify({
-      error: 'Failed to process request'
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+  const prompt = `以下は英語のニュース記事です。\n\n${article}\n\nこの内容の要点（Insight）を3行で要約し、そのあとに日本語で翻訳してください。形式は以下に従ってください：\n\nInsight:\n...\n\nTranslation:\n...`;
+
+  const chat = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  const responseText = chat.choices[0].message.content || "";
+
+  const [_, insightPart, translationPart] =
+    responseText.match(/Insight:\s*([\s\S]*?)Translation:\s*([\s\S]*)/) || [];
+
+  return NextResponse.json({
+    insight: insightPart?.trim() || "",
+    translation: translationPart?.trim() || "",
+  });
 }
