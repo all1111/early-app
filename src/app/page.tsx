@@ -1,3 +1,4 @@
+/* src/app/page.tsx まるっと ※insight 関係を削除した版 */
 "use client";
 export const dynamic = "force-dynamic"; // 毎リクエストで新鮮データ
 
@@ -13,44 +14,16 @@ type Article = {
 
 export default function Page() {
   const [articles, setArticles] = useState<Article[]>([]);
-  const [insights, setInsights] = useState<Record<string, string>>({});
 
-  /* -------------------- News を取得 -------------------- */
+  /* ─ NewsAPI 取得 ───────────────────── */
   useEffect(() => {
     const fetchNews = async () => {
-      try {
-        const res = await fetch("/api/news");
-        const data = await res.json();
-        setArticles(data.articles ?? []);
-      } catch (err) {
-        console.error("News fetch error:", err);
-      }
+      const res = await fetch("/api/news");
+      const data = await res.json();
+      setArticles(data.articles ?? []);
     };
     fetchNews();
   }, []);
-
-  /* ------------------- summarize 呼び出し（停止中） ------------------- */
-  /*
-  useEffect(() => {
-    const summarize = async () => {
-      for (const article of articles) {
-        try {
-          const res = await fetch("/api/summarize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: article.content || article.title }),
-          });
-          const data = await res.json();
-          setInsights(prev => ({ ...prev, [article.title]: data.insight }));
-        } catch (err) {
-          console.error("Summarize error:", err);
-        }
-      }
-    };
-    if (articles.length > 0) summarize();
-  }, [articles]);
-  */
-  /* ------------------------------------------------------------------ */
 
   return (
     <div className="p-6 space-y-4">
@@ -69,13 +42,6 @@ export default function Page() {
             >
               記事を読む →
             </a>
-
-            {/* summarize を再有効化したら表示される */}
-            {insights[article.title] && (
-              <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">
-                {insights[article.title]}
-              </p>
-            )}
           </CardContent>
         </Card>
       ))}
