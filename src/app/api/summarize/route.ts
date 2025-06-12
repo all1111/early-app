@@ -22,11 +22,14 @@ export async function POST(req: NextRequest) {
 
   const responseText = chat.choices[0].message.content || "";
 
-  const [_, insightPart, translationPart] =
-    responseText.match(/Insight:\s*([\s\S]*?)Translation:\s*([\s\S]*)/) || [];
+  // InsightとTranslationの抽出
+  const match = responseText.match(/Insight:\s*([\s\S]*?)Translation:\s*([\s\S]*)/);
+
+  const insightPart = match?.[1]?.trim() || "";
+  const translationPart = match?.[2]?.trim() || "";
 
   return NextResponse.json({
-    insight: insightPart?.trim() || "",
-    translation: translationPart?.trim() || "",
+    insight: insightPart,
+    translation: translationPart,
   });
 }
