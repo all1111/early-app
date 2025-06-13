@@ -1,82 +1,91 @@
 "use client";
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // 毎回最新データ
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
 
+/* ---------- 型 ---------- */
 type Article = {
   title: string;
-  content: string;        // NewsAPI から
-  description: string;    // fallback
+  content: string;
   publishedAt: string;
   url: string;
 };
 
-type Insight = {
-  titleJa: string;
-  insightEn: string;
-  insightJa: string;
+type JPInfo = {
+  summary: string;  // 要約（日本語）
+  insight: string;  // インサイト（日本語）
 };
 
+/* ---------- 画面 ---------- */
 export default function Page() {
   const [articles, setArticles] = useState<Article[]>([]);
-  const [insights, setInsights] = useState<Record<string, Insight>>({});
+  const [infos, setInfos] = useState<Record<string, JPInfo>>({});
 
-  /* -------- NewsAPI -------- */
+  /* 📰 ニュース取得 -------------------------------------------------- */
   useEffect(() => {
-    const fetchNews = async () => {
-      const res = await fetch("/api/news");
-      const data = await res.json();
-      setArticles(data.articles || []);
-    };
-    fetchNews();
+    (async () => {
+      try {
+        const res = await fetch("/api/news");
+        const data = await res.json();
+        setArticles(data.articles ?? []);
+      } catch (err) {
+        console.error("ニュース取得失敗", err);
+      }
+    })();
   }, []);
 
-  /* -------- GPT 要約＆翻訳 -------- */
+  /* 🤖 要約 & インサイト取得 ---------------------------------------- */
   useEffect(() => {
     if (!articles.length) return;
 
     (async () => {
-      const result: Record<string, Insight> = {};
-      for (const a of articles) {
-        const body = JSON.stringify({
-          title: a.title,
-          content: a.content || a.description || a.title,
-        });
-        const res = await fetch("/api/summarize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
-        result[a.title] = await res.json();
-      }
-      setInsights(result);
-    })();
-  }, [articles]);
+      for (const article of articles) {
+        if (infos[article.title]) continue; // 既に取得済みならスキップ
 
-  /* -------- 表示 -------- */
+        try {
+          const res = await fetch("/api/summarize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: article.title,
+              content: article.content ?? "",
+            }),
+          });
+
+          const data: JPInfo = await res.json();
+          setInfos(prev => ({ ...prev, [article.title]: data }));
+        } catch (err) {
+          console.error("要約生成失敗", err);
+        }
+      }
+    })();
+  }, [articles, infos]);
+
+  /* ---------- 描画 ---------- */
   return (
-    <div className="p-6 space-y-6">
-      {articles.map((a) => {
-        const info = insights[a.title];
-        const snippet =
-          (a.content || a.description || "").split("[")[0].slice(0, 160) + "…";
+    <main className="p-6 space-y-6 max-w-2xl mx-auto">
+      {articles.map(article => {
+        const info = infos[article.title];
 
         return (
-          <Card key={a.title}>
+          <Card key={article.title}>
             <CardHeader>
-              <CardTitle className="text-base font-semibold">{a.title}</CardTitle>
-
-              {/* 日本語タイトル（あれば） */}
-              {info?.titleJa && (
-                <p className="text-sm text-gray-600 mt-1">{info.titleJa}</p>
-              )}
+              <CardTitle className="text-lg font-semibold">
+                {article.title /* ←英語タイトルそのまま */ }
+              </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-2">
-              <p className="text-xs text-gray-400">{a.publishedAt}</p>
+              <p className="text-xs text-gray-500">{article.publishedAt}</p>
+
               <a
-                href={a.url}
+                href={article.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 underline"
@@ -84,23 +93,19 @@ export default function Page() {
                 記事を読む →
               </a>
 
-              {/* --- ① Insight 翻訳（JP）→ ② Insight 原文（EN） --- */}
               {info && (
                 <>
-                  <h4 className="font-semibold">Insight (JP)</h4>
-                  <p className="whitespace-pre-wrap text-sm">{info.insightJa}</p>
+                  <h4 className="font-bold pt-2">要約</h4>
+                  <p className="text-sm whitespace-pre-wrap">{info.summary}</p>
 
-                  <h4 className="font-semibold mt-1">Insight (EN)</h4>
-                  <p className="whitespace-pre-wrap text-sm">{info.insightEn}</p>
+                  <h4 className="font-bold pt-2">インサイト</h4>
+                  <p className="text-sm whitespace-pre-wrap">{info.insight}</p>
                 </>
               )}
-
-              {/* 元記事スニペット（英語） */}
-              <p className="text-xs text-gray-500 mt-2 line-clamp-3">{snippet}</p>
             </CardContent>
           </Card>
         );
       })}
-    </div>
+    </main>
   );
 }
