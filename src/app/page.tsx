@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 
 type Article = {
   title: string;
-  content: string;
+  content: string;        // NewsAPI から
+  description: string;    // fallback
   publishedAt: string;
   url: string;
 };
@@ -21,7 +22,7 @@ export default function Page() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [insights, setInsights] = useState<Record<string, Insight>>({});
 
-  // --- NewsAPI で取得 -------------------------------------------------
+  /* -------- NewsAPI -------- */
   useEffect(() => {
     const fetchNews = async () => {
       const res = await fetch("/api/news");
@@ -31,36 +32,40 @@ export default function Page() {
     fetchNews();
   }, []);
 
-  // --- GPT 要約 + 翻訳 -------------------------------------------------
+  /* -------- GPT 要約＆翻訳 -------- */
   useEffect(() => {
-    const summarizeAll = async () => {
-      const results: Record<string, Insight> = {};
+    if (!articles.length) return;
+
+    (async () => {
+      const result: Record<string, Insight> = {};
       for (const a of articles) {
+        const body = JSON.stringify({
+          title: a.title,
+          content: a.content || a.description || a.title,
+        });
         const res = await fetch("/api/summarize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: a.title, content: a.content }),
+          body,
         });
-        const data = await res.json();
-        results[a.title] = data; // titleJa / insightEn / insightJa
+        result[a.title] = await res.json();
       }
-      setInsights(results);
-    };
-    if (articles.length) summarizeAll();
+      setInsights(result);
+    })();
   }, [articles]);
 
-  // --- 画面 -----------------------------------------------------------
+  /* -------- 表示 -------- */
   return (
     <div className="p-6 space-y-6">
       {articles.map((a) => {
         const info = insights[a.title];
+        const snippet =
+          (a.content || a.description || "").split("[")[0].slice(0, 160) + "…";
+
         return (
           <Card key={a.title}>
             <CardHeader>
-              {/* 英語タイトル */}
-              <CardTitle className="text-base font-semibold">
-                {a.title}
-              </CardTitle>
+              <CardTitle className="text-base font-semibold">{a.title}</CardTitle>
 
               {/* 日本語タイトル（あれば） */}
               {info?.titleJa && (
@@ -79,20 +84,19 @@ export default function Page() {
                 記事を読む →
               </a>
 
-              {/* Insight EN & JP */}
+              {/* --- ① Insight 翻訳（JP）→ ② Insight 原文（EN） --- */}
               {info && (
                 <>
-                  <h4 className="font-semibold">Insight</h4>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {info.insightEn}
-                  </p>
+                  <h4 className="font-semibold">Insight (JP)</h4>
+                  <p className="whitespace-pre-wrap text-sm">{info.insightJa}</p>
 
-                  <h4 className="font-semibold mt-1">Translation</h4>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {info.insightJa}
-                  </p>
+                  <h4 className="font-semibold mt-1">Insight (EN)</h4>
+                  <p className="whitespace-pre-wrap text-sm">{info.insightEn}</p>
                 </>
               )}
+
+              {/* 元記事スニペット（英語） */}
+              <p className="text-xs text-gray-500 mt-2 line-clamp-3">{snippet}</p>
             </CardContent>
           </Card>
         );
