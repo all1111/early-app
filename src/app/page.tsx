@@ -1,105 +1,102 @@
 "use client";
-export const dynamic = "force-dynamic"; // 毎回最新
+export const dynamic = "force-dynamic";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 
-// ニュース記事型
 type Article = {
   title: string;
-  content: string;      // NewsAPI の description / content
+  content: string;
   publishedAt: string;
   url: string;
 };
 
-// Insight+翻訳型
 type Insight = {
-  insight: string;
-  translation: string;
+  titleJa: string;
+  insightEn: string;
+  insightJa: string;
 };
 
 export default function Page() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [insights, setInsights] = useState<Record<string, Insight>>({});
 
-  // ─ STEP 1: NewsAPI で記事取得 ─
+  // --- NewsAPI で取得 -------------------------------------------------
   useEffect(() => {
-    (async () => {
+    const fetchNews = async () => {
       const res = await fetch("/api/news");
-      if (!res.ok) return console.error("/api/news", res.status);
       const data = await res.json();
-      setArticles(data.articles ?? []);
-    })();
+      setArticles(data.articles || []);
+    };
+    fetchNews();
   }, []);
 
-  // ─ STEP 2: 1件ずつ GPT 要約 ─
+  // --- GPT 要約 + 翻訳 -------------------------------------------------
   useEffect(() => {
-    if (articles.length === 0) return;
-
-    const run = async () => {
-      for (const article of articles) {
-        // すでに取得済みならスキップ
-        if (insights[article.title]) continue;
-
+    const summarizeAll = async () => {
+      const results: Record<string, Insight> = {};
+      for (const a of articles) {
         const res = await fetch("/api/summarize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: article.content || article.title,
-          }),
+          body: JSON.stringify({ title: a.title, content: a.content }),
         });
-
-        if (!res.ok) {
-          console.error("/api/summarize", res.status);
-          continue;
-        }
-
-        const data: Insight = await res.json();
-        setInsights((prev) => ({ ...prev, [article.title]: data }));
+        const data = await res.json();
+        results[a.title] = data; // titleJa / insightEn / insightJa
       }
+      setInsights(results);
     };
+    if (articles.length) summarizeAll();
+  }, [articles]);
 
-    run();
-  }, [articles, insights]);
-
-  // ───── Render ─────
+  // --- 画面 -----------------------------------------------------------
   return (
-    <main className="p-6 space-y-6 max-w-xl mx-auto">
-      {articles.map((a) => (
-        <Card key={a.title}>
-          <CardHeader>
-            <CardTitle>{a.title}</CardTitle>
-          </CardHeader>
+    <div className="p-6 space-y-6">
+      {articles.map((a) => {
+        const info = insights[a.title];
+        return (
+          <Card key={a.title}>
+            <CardHeader>
+              {/* 英語タイトル */}
+              <CardTitle className="text-base font-semibold">
+                {a.title}
+              </CardTitle>
 
-          <CardContent>
-            <p className="text-sm text-gray-500">{a.publishedAt}</p>
+              {/* 日本語タイトル（あれば） */}
+              {info?.titleJa && (
+                <p className="text-sm text-gray-600 mt-1">{info.titleJa}</p>
+              )}
+            </CardHeader>
 
-            <a
-              href={a.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 underline mt-2 inline-block"
-            >
-              記事を読む →
-            </a>
+            <CardContent className="space-y-2">
+              <p className="text-xs text-gray-400">{a.publishedAt}</p>
+              <a
+                href={a.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 underline"
+              >
+                記事を読む →
+              </a>
 
-            {insights[a.title] && (
-              <>
-                <p className="mt-4 whitespace-pre-wrap">
-                  <strong>Insight</strong>
-                  <br />
-                  {insights[a.title].insight}
-                </p>
-                <p className="mt-4 whitespace-pre-wrap">
-                  <strong>Translation</strong>
-                  <br />
-                  {insights[a.title].translation}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </main>
+              {/* Insight EN & JP */}
+              {info && (
+                <>
+                  <h4 className="font-semibold">Insight</h4>
+                  <p className="whitespace-pre-wrap text-sm">
+                    {info.insightEn}
+                  </p>
+
+                  <h4 className="font-semibold mt-1">Translation</h4>
+                  <p className="whitespace-pre-wrap text-sm">
+                    {info.insightJa}
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
