@@ -1,5 +1,5 @@
 "use client";
-export const dynamic = "force-dynamic"; // 毎回最新データ
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import {
@@ -18,29 +18,39 @@ type Article = {
 };
 
 type JPInfo = {
-  summary: string;  // 要約（日本語）
-  insight: string;  // インサイト（日本語）
+  titleJa: string;
+  summary: string;
+  insight: string;
 };
 
-/* ---------- 画面 ---------- */
+/* ---------- 相対時間変換 ---------- */
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const sec = Math.round(diff / 1000);
+  const mins = Math.round(sec / 60);
+  const hours = Math.round(mins / 60);
+  const days = Math.round(hours / 24);
+  if (days > 0) return `${days}日前`;
+  if (hours > 0) return `${hours}時間前`;
+  if (mins > 0) return `${mins}分前`;
+  return "たった今";
+}
+
+/* ---------- ページ ---------- */
 export default function Page() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [infos, setInfos] = useState<Record<string, JPInfo>>({});
 
-  /* 📰 ニュース取得 -------------------------------------------------- */
+  /* 📰 NewsAPI ------------------------------------------------ */
   useEffect(() => {
     (async () => {
-      try {
-        const res = await fetch("/api/news");
-        const data = await res.json();
-        setArticles(data.articles ?? []);
-      } catch (err) {
-        console.error("ニュース取得失敗", err);
-      }
+      const res = await fetch("/api/news");
+      const data = await res.json();
+      setArticles(data.articles ?? []);
     })();
   }, []);
 
-  /* 🤖 要約 & インサイト取得 ---------------------------------------- */
+  /* 🤖 GPT 要約 ------------------------------------------------ */
   useEffect(() => {
     if (!articles.length) return;
 
@@ -48,26 +58,22 @@ export default function Page() {
       for (const article of articles) {
         if (infos[article.title]) continue; // 既に取得済みならスキップ
 
-        try {
-          const res = await fetch("/api/summarize", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: article.title,
-              content: article.content ?? "",
-            }),
-          });
+        const res = await fetch("/api/summarize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: article.title,
+            content: article.content ?? "",
+          }),
+        });
 
-          const data: JPInfo = await res.json();
-          setInfos(prev => ({ ...prev, [article.title]: data }));
-        } catch (err) {
-          console.error("要約生成失敗", err);
-        }
+        const data: JPInfo = await res.json();
+        setInfos(prev => ({ ...prev, [article.title]: data }));
       }
     })();
   }, [articles, infos]);
 
-  /* ---------- 描画 ---------- */
+  /* ---------- 表示 ---------- */
   return (
     <main className="p-6 space-y-6 max-w-2xl mx-auto">
       {articles.map(article => {
@@ -76,13 +82,14 @@ export default function Page() {
         return (
           <Card key={article.title}>
             <CardHeader>
+              {/* 日本語訳タイトルが届いたら差し替える */}
               <CardTitle className="text-lg font-semibold">
-                {article.title /* ←英語タイトルそのまま */ }
+                {info?.titleJa ?? article.title}
               </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-2">
-              <p className="text-xs text-gray-500">{article.publishedAt}</p>
+              <p className="text-xs text-gray-500">{timeAgo(article.publishedAt)}</p>
 
               <a
                 href={article.url}
@@ -95,10 +102,10 @@ export default function Page() {
 
               {info && (
                 <>
-                  <h4 className="font-bold pt-2">要約</h4>
+                  <h4 className="font-bold pt-3">要約</h4>
                   <p className="text-sm whitespace-pre-wrap">{info.summary}</p>
 
-                  <h4 className="font-bold pt-2">インサイト</h4>
+                  <h4 className="font-bold pt-3">インサイト</h4>
                   <p className="text-sm whitespace-pre-wrap">{info.insight}</p>
                 </>
               )}
