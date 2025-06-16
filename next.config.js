@@ -2,23 +2,18 @@
 module.exports = {
     images: {
       remotePatterns: [
-        /* 既存で許可していたドメイン
-        -------------------------------------------------- */
+        /* これまで追加したドメイン ------------------------------- */
         { protocol: 'https', hostname: 'ichef.bbci.co.uk' },      // BBC
         { protocol: 'https', hostname: 'static01.nyt.com' },      // NYTimes
         { protocol: 'https', hostname: 'media.cnn.com' },         // CNN
         { protocol: 'https', hostname: 'static.politico.com' },   // Politico
+        { protocol: 'https', hostname: 'mmjunkie.usatoday.com' }, // USA Today (旧表記)
+        { protocol: 'https', hostname: 'assets.bwbx.io' },        // Bloomberg
   
-        /* 新しく 400 が出ていたドメイン
-        -------------------------------------------------- */
-        { protocol: 'https', hostname: 'mmjunkie.usatoday.com' }, // USA Today 画像 CDN
-        { protocol: 'https', hostname: 'assets.bwbx.io' },        // Bloomberg 画像 CDN
+        /* ←↑ ここまではそのまま ------------------------------- */
   
-        /* ↓必要に応じて追加していく（例）
-        --------------------------------------------------
-        { protocol: 'https', hostname: '**.washingtonpost.com' },
-        { protocol: 'https', hostname: 'media.foxnews.com' },
-        */
+        /* 🆕 追加：MMA Junkie (USA TODAY Network) 画像 CDN */
+        { protocol: 'https', hostname: 'mmajunkie.usatoday.com' },
       ],
     },
   };
