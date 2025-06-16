@@ -1,113 +1,82 @@
 "use client";
-export const dynamic = "force-dynamic"; // 毎リクエストで最新データ
-
 import Image from "next/image";
-import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/ja";
+import type { FC } from "react";
+import { flagEmoji } from "@/lib/utils";
 
 dayjs.extend(relativeTime);
 dayjs.locale("ja");
 
-/* ---------- 型定義 ---------- */
 type Article = {
-  title: string;            // 英語タイトル
-  titleJa?: string;         // 日本語タイトル（任意）
-  publishedAt: string;      // ISO 文字列
-  url: string;              // 元記事 URL
-  urlToImage?: string;      // サムネイル URL（任意）
-  countryCode?: string;     // ISO2 国コード（任意）
-  insight?: string;         // 日本語 500 字前後の解説（任意）
+  title: string;
+  titleJa: string;
+  descriptionJa: string;   // ← 要約
+  insightJa: string;       // ← 解説(500字前後)
+  url: string;
+  image: string;           // 300x180 固定
+  publishedAt: string;
+  country: string;         // ISO-2 (JP/US/GB…)
 };
 
-/* ---------- 国旗絵文字ユーティリティ ---------- */
-const flagEmoji = (code?: string) =>
-  code && code.length === 2
-    ? String.fromCodePoint(
-        ...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
-      )
-    : "🏳️";
+export default async function Page() {
+  /** /api/news で 10 件取り、サーバー側で GPT 処理済み JSON を返す構成 */
+  const res = await fetch(`${process.env.NEXT_PUBLIC_ORIGIN}/api/news`, {
+    cache: "no-store",
+  });
+  const { articles }: { articles: Article[] } = await res.json();
 
-/* ---------- React コンポーネント ---------- */
-export default function Page() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  /* ニュース取得 */
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/news", { cache: "no-store" });
-        const data = await res.json();
-
-        // data が配列の場合 / {articles: [...]} の場合どちらにも対応
-        const arr = Array.isArray(data) ? data : data.articles ?? [];
-        if (Array.isArray(arr)) {
-          setArticles(arr);
-        } else {
-          console.error("data is not array", data);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  if (loading) return <p className="p-6">読み込み中…</p>;
+  if (!Array.isArray(articles)) {
+    console.error("data is not array", { articles });
+    return <p>読み込み中…</p>;
+  }
 
   return (
-    <div className="space-y-6 p-6">
-      {articles.map((a, idx) => (
-        <article
-          key={idx}
-          className="border rounded-md p-4 space-y-2 shadow-sm max-w-[340px]"
-        >
-          {/* タイトル（国旗 + 日本語タイトルがあればそちら優先） */}
-          <h2 className="font-bold text-lg">
-            {flagEmoji(a.countryCode)} {a.titleJa ?? a.title}
-          </h2>
-
-          {/* 投稿日時を相対表現 */}
-          <p className="text-xs text-gray-500">
-            {dayjs(a.publishedAt).fromNow()}
-          </p>
-
-          {/* 元記事リンク */}
-          <a
-            href={a.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-blue-600 underline"
-          >
-            記事を読む →
-          </a>
-
-          {/* サムネイル（300×180） */}
-          <div className="w-[300px] h-[180px] bg-gray-200 rounded relative overflow-hidden flex items-center justify-center text-gray-400 select-none text-4xl">
-            {a.urlToImage ? (
-              <Image
-                src={a.urlToImage}
-                alt={a.title}
-                fill
-                style={{ objectFit: "cover" }}
-              />
-            ) : (
-              "Image"
-            )}
-          </div>
-
-          {/* 解説（Insight 日本語訳を 500 字前後で保存しておく想定） */}
-          {a.insight && (
-            <p className="whitespace-pre-wrap">
-              <strong>【解説】</strong>
-              {a.insight}
-            </p>
-          )}
-        </article>
+    <div className="max-w-xl mx-auto space-y-8 p-4">
+      {articles.map((a) => (
+        <ArticleCard key={a.url} {...a} />
       ))}
     </div>
   );
 }
+
+const ArticleCard: FC<Article> = ({
+  title,
+  titleJa,
+  descriptionJa,
+  insightJa,
+  url,
+  image,
+  publishedAt,
+  country,
+}) => (
+  <article className="border rounded-xl p-4 space-y-2 shadow-sm">
+    <h2 className="font-semibold leading-snug flex items-start gap-1">
+      <span className="text-xl">{flagEmoji(country)}</span>
+      <span>{titleJa || title}</span>
+    </h2>
+
+    <time className="text-xs text-gray-500">
+      {dayjs(publishedAt).fromNow()}
+    </time>
+
+    <a href={url} target="_blank" rel="noopener" className="text-sm text-blue-600 underline">
+      記事を読む →
+    </a>
+
+    <Image
+      src={image}
+      alt={title}
+      width={300}
+      height={180}
+      className="rounded-md object-cover w-[300px] h-[180px]"
+      unoptimized
+    />
+
+    <section className="text-sm leading-relaxed space-y-1">
+      <p>【要約】{descriptionJa}</p>
+      <p>【解説】{insightJa}</p>
+    </section>
+  </article>
+);
