@@ -2,40 +2,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 export const dynamic = "force-dynamic";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
-    const { articles } = await req.json();      // ← 必ず配列
+    // ────────────────── リクエストボディ ──────────────────
+    // page.tsx から送られてくる JSON は
+    // { title: string; content: string; image?: string; countryCode?: string }
+    //----------------------------------------------------------------------
+    const { title, content } = await req.json();
 
-    /* GPT-4o に丸投げして一括和訳＋要約＋解説を生成させる */
+    // ────────────── ChatGPT へのプロンプト ──────────────
+    const prompt = `
+# 指示
+以下の英文ニュース記事について
+1行目 : 記事タイトルの日本語訳  
+2行目 : 【解説】 と書き出す  
+3行目以降 : 400 文字以内でわかりやすく解説する  
+`.trim();
+
     const chat = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.3,
       messages: [
+        { role: "system", content: prompt },
         {
           role: "user",
-          content: `
-以下の JSON 配列は英語ニュースです。
-各要素ごとに次のフィールドを追加してください。
-- titleJa   : 日本語タイトル
-- summaryJa : 3 行以内の要約 (日本語)
-- insightJa : 約 400〜500 字の解説 (日本語)
-
-JSON だけを返してください。\n\n${JSON.stringify(articles)}
-        `.trim(),
+          content: `タイトル: ${title}\n\n本文:\n${content}`,
         },
       ],
     });
 
-    /* GPT から返ってくるのは articles 配列だけの想定 */
-    const enriched = JSON.parse(chat.choices[0].message.content ?? "[]");
-    return NextResponse.json(enriched);
-  } catch (err: any) {
-    console.error("[/api/summarize] error", err);
+    //---------------------------------------------------------------
+    // 生成結果をそのまま返却
+    //---------------------------------------------------------------
+    return NextResponse.json({ result: chat.choices[0].message.content });
+  } catch (err: unknown) {
+    // eslint で any を禁止しているため unknown → Error にアサーション
+    const e = err as Error;
+    console.error("[/api/summarize] error", e);
+
     return NextResponse.json(
-      { message: err?.message ?? "unexpected error" },
+      { message: e.message ?? "unexpected error" },
       { status: 500 },
     );
   }
