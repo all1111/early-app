@@ -8,6 +8,15 @@
         "publishedAt": "2025-06-16T01:23:45Z",
         "insightJa": "これはテスト用のニュース解説です。",
         "country": "US"
+      },
+      {
+        "title": "New Article",
+        "titleJa": "新しい記事タイトル",
+        "url": "https://example2.com",
+        "imageUrl": "https://placehold.co/300x180?text=New",
+        "publishedAt": "2025-06-16T05:00:00Z",
+        "insightJa": "これは新しい記事の解説です。",
+        "country": "JP"
       }
     ]
   }
