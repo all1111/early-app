@@ -1,0 +1,14 @@
+{
+    "articles": [
+      {
+        "title": "Example News Title",
+        "titleJa": "例のニュースタイトル",
+        "url": "https://example.com",
+        "imageUrl": "https://placehold.co/300x180?text=Example",
+        "publishedAt": "2025-06-16T01:23:45Z",
+        "insightJa": "これはテスト用のニュース解説です。",
+        "country": "US"
+      }
+    ]
+  }
+  
