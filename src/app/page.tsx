@@ -1,5 +1,6 @@
+// src/app/page.tsx
 "use client";
-export const dynamic = "force-dynamic"; // 毎リクエストで最新
+export const dynamic = "force-dynamic";
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -10,96 +11,97 @@ dayjs.extend(relativeTime);
 dayjs.locale("ja");
 
 type Article = {
-  id: string;            // →   /api/news で付与
-  title: string;         // 英語タイトル
-  titleJa: string;       // 日本語タイトル (GPT 和訳)
-  url: string;           // オリジナル記事 URL
-  publishedAt: string;   // ISO 文字列
-  imageUrl: string;      // 300×180 サムネ
-  summaryJa: string;     // 要約（日本語 3 行前後）
-  insightJa: string;     // 解説（日本語 ≒ 400〜500字）
-  countryCode: string;   // 例 "us"  → 🇺🇸
+  id: string;                    // ← 追加（key 用）
+  title: string;
+  titleJa: string;
+  url: string;
+  image: string;
+  publishedAt: string;
+  insightJa: string;
+  countryEmoji: string;
 };
 
 export default function Page() {
+  /** ❶ ① 初期値を「からの配列」にする  */
   const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
 
+  /** ❷ NewsAPI → articles.json をフェッチ */
   useEffect(() => {
-    /** ① まずサーバー側 API から「英語の記事 10 件」取得  */
-    const fetchNews = async () => {
-      const res = await fetch("/api/news?limit=10");      // ← 自前実装済みの NewsAPI ラッパー
-      const data = await res.json();                      // data.articles: Article[] (英語)
-      /** ② OpenAI に「タイトル和訳・要約・解説」をまとめて生成させる */
-      const res2 = await fetch("/api/summarize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articles: data.articles }), // まとめて送信してコスト削減
-      });
-      const enriched = (await res2.json()) as Article[];
-      setArticles(enriched);
-      setLoading(false);
-    };
-    fetchNews();
+    (async () => {
+      try {
+        const res = await fetch("/data/articles.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("fetch error");
+        /** ❸ Array 判定でガード（.map エラー防止） */
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setArticles(data as Article[]);
+        } else {
+          console.error("data is not array", data);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, []);
 
-  if (loading) return <p className="p-6">🌀 読み込み中…</p>;
+  if (!articles.length) {
+    return <p style={{ padding: 24 }}>読み込み中...</p>;
+  }
 
+  /** ❹ 正常に配列なら map できる */
   return (
-    <main className="p-6 max-w-3xl mx-auto">
+    <main style={{ padding: 24, maxWidth: 680, margin: "0 auto" }}>
       {articles.map((a) => (
         <article
           key={a.id}
-          className="border rounded-lg p-4 shadow-sm mb-6 bg-white"
+          style={{
+            border: "1px solid #ddd",
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 24,
+          }}
         >
-          {/* ---------- タイトル & 国旗 ---------- */}
-          <h2 className="text-lg font-bold mb-1">
-            {countryFlag(a.countryCode)} {a.titleJa}
+          <h2 style={{ fontWeight: 600, fontSize: 18 }}>
+            {a.countryEmoji}&nbsp;{a.titleJa || a.title}
           </h2>
 
-          {/* ---------- 投稿日時（相対） ---------- */}
-          <div className="text-xs text-gray-500 mb-1">
-            {dayjs(a.publishedAt).fromNow()}
-          </div>
-
-          {/* ---------- 記事リンク ---------- */}
-          <a
-            href={a.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 underline text-sm"
+          {/* 相対時間 */}
+          <time
+            dateTime={a.publishedAt}
+            style={{ fontSize: 12, color: "#666" }}
           >
-            記事を読む →
-          </a>
+            {dayjs(a.publishedAt).fromNow()}
+          </time>
 
-          {/* ---------- 画像 ---------- */}
-          <div className="my-2">
-            <Image
-              src={a.imageUrl || "/noimage.svg"}
-              width={300}
-              height={180}
-              alt={a.titleJa}
-              className="rounded object-cover w-[300px] h-[180px]"
-            />
+          {/* オリジナル記事 */}
+          <div style={{ margin: "4px 0 8px" }}>
+            <a
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 14, color: "#167" }}
+            >
+              記事を読む →
+            </a>
           </div>
 
-          {/* ---------- 要約 ---------- */}
-          <p className="text-sm font-bold">【要約】</p>
-          <p className="text-sm mb-2 whitespace-pre-wrap">{a.summaryJa}</p>
+          {/* 画像（300×180） */}
+          <Image
+            src={a.image}
+            alt={a.title}
+            width={300}
+            height={180}
+            style={{ objectFit: "cover", borderRadius: 4 }}
+          />
 
-          {/* ---------- 解説 ---------- */}
-          <p className="text-sm font-bold">【解説】</p>
-          <p className="text-sm whitespace-pre-wrap">{a.insightJa}</p>
+          {/* 解説 */}
+          <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6 }}>
+            <strong>【解説】</strong>
+            <br />
+            {a.insightJa}
+          </p>
         </article>
       ))}
     </main>
-  );
-}
-
-/* 国コード → 絵文字 🇯🇵 変換（簡易版） */
-function countryFlag(code: string) {
-  if (!code) return "";
-  return String.fromCodePoint(
-    ...[...code.toUpperCase()].map((c) => 0x1f1e6 + (c.charCodeAt(0) - 65))
   );
 }
