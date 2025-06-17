@@ -1,4 +1,3 @@
-// src/app/api/summarize/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -8,38 +7,55 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
-    // ────────────────── リクエストボディ ──────────────────
-    // page.tsx から送られてくる JSON は
-    // { title: string; content: string; image?: string; countryCode?: string }
-    //----------------------------------------------------------------------
-    const { title, content } = await req.json();
+    const { title, content, country = "US" } = await req.json();
 
-    // ────────────── ChatGPT へのプロンプト ──────────────
     const prompt = `
 # 指示
-以下の英文ニュース記事について
-1行目 : 記事タイトルの日本語訳  
-2行目 : 【解説】 と書き出す  
-3行目以降 : 400 文字以内でわかりやすく解説する  
+以下の英文ニュース記事について、JSON形式で回答してください：
+
+{
+  "titleJa": "記事タイトルの日本語訳",
+  "descriptionJa": "記事の要約（200文字以内）",
+  "insightJa": "詳細解説（400文字以内）",
+  "impactJa": "日本への影響分析（300文字以内）",
+  "audioScript": "音声配信用のスクリプト（500文字以内、自然な話し言葉）"
+}
+
+記事タイトル: ${title}
+記事内容: ${content}
+発信国: ${country}
 `.trim();
 
     const chat = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: prompt },
-        {
-          role: "user",
-          content: `タイトル: ${title}\n\n本文:\n${content}`,
-        },
+        { role: "system", content: "あなたは日本のニュース解説者です。海外ニュースを日本の視聴者向けに分かりやすく解説します。" },
+        { role: "user", content: prompt }
       ],
     });
 
-    //---------------------------------------------------------------
-    // 生成結果をそのまま返却
-    //---------------------------------------------------------------
-    return NextResponse.json({ result: chat.choices[0].message.content });
+    const result = chat.choices[0].message.content;
+    
+    try {
+      const parsed = JSON.parse(result || "{}");
+      return NextResponse.json({
+        titleJa: parsed.titleJa || title,
+        descriptionJa: parsed.descriptionJa || "",
+        insightJa: parsed.insightJa || "",
+        impactJa: parsed.impactJa || "",
+        audioScript: parsed.audioScript || ""
+      });
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", parseError);
+      return NextResponse.json({
+        titleJa: title,
+        descriptionJa: "要約を生成できませんでした",
+        insightJa: "解説を生成できませんでした",
+        impactJa: "影響分析を生成できませんでした",
+        audioScript: "音声スクリプトを生成できませんでした"
+      });
+    }
   } catch (err: unknown) {
-    // eslint で any を禁止しているため unknown → Error にアサーション
     const e = err as Error;
     console.error("[/api/summarize] error", e);
 
