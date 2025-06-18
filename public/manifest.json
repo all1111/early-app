@@ -1,0 +1,28 @@
+{
+  "name": "EARLY - 海外ニュースを日本語で",
+  "short_name": "EARLY",
+  "description": "世界のニュースを日本語要約で、日本への影響分析と音声配信付き",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["news", "productivity"],
+  "lang": "ja",
+  "dir": "ltr"
+}
