@@ -1,8 +1,4 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" 
-});
+// OpenAIクライアントの直接使用を削除 - セキュリティのためサーバーサイドAPIを使用
 
 type CurrentsArticle = {
   title: string;
@@ -66,10 +62,7 @@ export async function getNewsArticles(): Promise<ProcessedArticle[]> {
       return getFallbackArticles();
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn("OPENAI_API_KEY is not set, using fallback");
-      return getFallbackArticles();
-    }
+    // OpenAI API keyチェックを削除 - サーバーサイドで処理
 
     // Currents APIから海外ニュースを取得（3秒タイムアウト）
     const apiKey = process.env.CURRENTS_API_KEY;
@@ -145,52 +138,44 @@ export async function getNewsArticles(): Promise<ProcessedArticle[]> {
   }
 }
 
-// 高速化されたAI処理関数
+// セキュアなAI処理関数 - サーバーサイドAPIを使用
 async function processArticleWithAI(article: CurrentsArticle): Promise<ProcessedArticle> {
-  const prompt = `
-以下の英文記事を日本語で要約してください。JSON形式で回答：
-
-{
-  "titleJa": "記事タイトルの日本語訳",
-  "descriptionJa": "要約（150文字以内）",
-  "insightJa": "解説（250文字以内）",
-  "impactJa": "日本への影響（200文字以内）",
-  "audioScript": "音声用スクリプト（300文字以内）"
-}
-
-タイトル: ${article.title}
-内容: ${(article.description || article.title).slice(0, 500)}
-`.trim();
-
-  const chat = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: "簡潔で正確な日本語要約を作成してください。" },
-      { role: "user", content: prompt }
-    ],
-    max_tokens: 800, // トークン数を削減
-    temperature: 0.3, // 速度重視
-  });
-
-  const result = chat.choices[0].message.content;
-  
   try {
-    const parsed = JSON.parse(result || "{}");
+    const response = await fetch('/api/openai', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        article: {
+          title: article.title,
+          description: article.description || article.title
+        },
+        type: 'summarize'
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("OpenAI API call failed:", response.status);
+      return createFallbackArticle(article);
+    }
+
+    const result = await response.json();
     
     return {
       title: article.title,
-      titleJa: parsed.titleJa || article.title,
-      descriptionJa: parsed.descriptionJa || "要約処理中です",
-      insightJa: parsed.insightJa || "解説を生成中です",
-      impactJa: parsed.impactJa || "影響分析を生成中です",
-      audioScript: parsed.audioScript || "音声スクリプトを生成中です",
+      titleJa: result.titleJa || article.title,
+      descriptionJa: result.descriptionJa || "要約処理中です",
+      insightJa: result.insightJa || "解説を生成中です",
+      impactJa: result.impactJa || "影響分析を生成中です",
+      audioScript: result.audioScript || "音声スクリプトを生成中です",
       url: article.url,
       image: article.image || "/placeholder-news.jpg",
       publishedAt: article.published,
       country: article.country[0] || "US",
     };
   } catch (error) {
-    console.error("Failed to parse AI response:", error);
+    console.error("Failed to process article with AI:", error);
     return createFallbackArticle(article);
   }
 }
